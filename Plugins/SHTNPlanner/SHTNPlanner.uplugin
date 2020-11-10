@@ -1,0 +1,34 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "SHTNPlanner",
+	"Description": "A Simple HTN Planner - Where Simple refers to the implementation and not the ease of usage",
+	"Category": "Other",
+	"CreatedBy": "Niels Strijkier (Strik3One)",
+	"CreatedByURL": "https://nielsstrijker.com",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "SHTNPlannerRuntime",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "SHTNPlannerEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "SHTNTestSuite",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}
