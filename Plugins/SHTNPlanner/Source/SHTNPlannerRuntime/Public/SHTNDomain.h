@@ -295,10 +295,10 @@ protected:
 
 struct SHTNPLANNERRUNTIME_API FSHTNWorldState
 {
-	FSHTNWorldState(const uint32 WorldStateSize = 64);
+	FSHTNWorldState();
 	~FSHTNWorldState();
 
-	void Reinit(const uint32 NewWorldStateSize = 64);
+	void Init(const uint32 NewWorldStateSize = 64);
 
 	bool CheckCondition(const FSHTNCondition& Condition) const;
 	FORCEINLINE bool CheckConditions(const TArray<FSHTNCondition>& Conditions) const

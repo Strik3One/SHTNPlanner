@@ -24,6 +24,32 @@ public:
 	FSHTNWorldState WorldState;
 	FSHTNDomain Domain;
 
+	// Debug Variables
+	FName OwningPawnName;
+	UEnum* WorldStateEnumAsset;
+
+	/** Starts brain logic. If brain is already running, will not do anything. */
+	virtual void StartLogic() override;
+
+	/** Restarts currently running or previously ran brain logic. */
+	virtual void RestartLogic() override;
+
+	/** Stops currently running brain logic. */
+	virtual void StopLogic(const FString& Reason) override;
+
+	/** AI logic won't be needed anymore, stop all activity and run cleanup */
+	//virtual void Cleanup() override {} 
+
+	/** Pause logic and blackboard updates. */
+	virtual void PauseLogic(const FString& Reason) override;
+
+	/** Resumes paused brain logic. */
+	virtual EAILogicResuming::Type ResumeLogic(const FString& Reason) override;
+
+	virtual bool IsRunning() const override;
+	virtual bool IsPaused() const override;
+	virtual void Cleanup() override;
+
 protected:
 	
 	FSHTNPlan Plan;
@@ -37,6 +63,9 @@ protected:
 	USHTNOperator_BlueprintBase* CurrentOperator;
 	FSHTNPrimitiveTask CurrentTask;
 	bool bReplan;
+
+	bool bIsPaused;
+	bool bIsRunning;
 	
 	void GeneratePlan();
 

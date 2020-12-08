@@ -47,5 +47,11 @@ bool USHTNNetwork_BlueprintBase::BuildNetwork(USHTNComponent * HTNComponent)
 	}
 
 	// Build the actual domain
-	return BuildHTNDomain(HTNComponent->Domain);
+	if (!BuildHTNDomain(HTNComponent->Domain))
+	{
+		UE_LOG(SHTNPlannerRuntime, Error, TEXT("Building of Domain in network %s returned false"), *GetName());
+		return false;
+	}
+
+	return true;
 }

@@ -73,16 +73,15 @@ int32 FSHTNCompositeTask::FindSatisfiedMethod(const FSHTNWorldState & WorldState
 //	WorldState
 //--------------------------------//
 
-FSHTNWorldState::FSHTNWorldState(const uint32 WorldStateSize)
+FSHTNWorldState::FSHTNWorldState()
 {
-	Values.AddZeroed(WorldStateSize);
 }
 
 FSHTNWorldState::~FSHTNWorldState()
 {
 }
 
-void FSHTNWorldState::Reinit(const uint32 NewWorldStateSize)
+void FSHTNWorldState::Init(const uint32 NewWorldStateSize)
 {
 	Values.Reset(NewWorldStateSize);
 	Values.AddZeroed(NewWorldStateSize);

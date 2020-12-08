@@ -37,12 +37,15 @@ public class SHTNPlannerEditor : ModuleRules
 			new string[]
 			{
 				"Core",
-				"CoreUObject",
+                "InputCore",
+                "CoreUObject",
                 "Slate",
                 "SlateCore",
                 "EditorStyle",
                 "Engine",
+                "AIModule",
                 "PropertyEditor",
+                "UnrealEd",
                 "SHTNPlannerRuntime"
             }
 			);

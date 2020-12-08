@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "SHTNDomain.h"
 //#include "SHTNNetwork_BlueprintBase.h"
 #include "SHTNControllerLibrary.generated.h"
 
@@ -20,7 +21,13 @@ class SHTNPLANNERRUNTIME_API USHTNControllerLibrary : public UBlueprintFunctionL
 	static void SetWorldStateAsValue(AActor* Target, uint8 WorldStateKey, int32 Value);
 
 	UFUNCTION(BlueprintCallable, Category = "SHTN")
-	static void SetWorldStateAsKeyValue(AActor* Target, uint8 WorldStateKey, uint8 KeyValue);
+	static void SetWorldStateAsKeyValue(AActor* Target, uint8 WorldStateKey, uint8 Key);
+
+	UFUNCTION(BlueprintCallable, Category = "SHTN")
+	static void ChangeWorldStateByValue(AActor* Target, ESHTNWorldStateOperation Operation, uint8 WorldStateKey, int32 Value);
+
+	UFUNCTION(BlueprintCallable, Category = "SHTN")
+	static void ChangeWorldStateByKeyValue(AActor* Target, ESHTNWorldStateOperation Operation, uint8 WorldStateKey, uint8 Key);
 
 	UFUNCTION(BlueprintCallable, Category = "SHTN")
 	static void GetWorldStateValue(AActor* Target, uint8 WorldStateKey, int32& Value, bool& bSuccess);

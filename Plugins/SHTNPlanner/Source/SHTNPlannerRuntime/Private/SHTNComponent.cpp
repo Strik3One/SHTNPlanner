@@ -12,6 +12,77 @@ USHTNComponent::USHTNComponent()
 
 	CurrentOperator = nullptr;
 	bReplan = true;
+	bIsPaused = false;
+	bIsRunning = true;
+}
+
+void USHTNComponent::StartLogic()
+{
+	if (bIsRunning)
+	{
+		UE_LOG(SHTNPlannerRuntime, Warning, TEXT("%s already has a running planner. Skipping logic.."), *GetName());
+		return;
+	}
+
+	if (Domain.IsValid())
+	{
+		bIsRunning = true;
+	}
+}
+
+void USHTNComponent::RestartLogic()
+{
+	StopLogic("Restarting");
+	StartLogic();
+}
+
+void USHTNComponent::StopLogic(const FString & Reason)
+{
+	if (!bIsRunning)
+	{
+		UE_LOG(SHTNPlannerRuntime, Warning, TEXT("%s doesnt have a running planner. Skipping logic.."), *GetName());
+		return;
+	}
+
+	if (CurrentOperator)
+	{
+		CurrentOperator->Abort(AIOwner, CurrentTask.Parameter);
+		CurrentOperator = nullptr;
+	}
+
+	bReplan = true;
+	bIsRunning = false;
+}
+
+void USHTNComponent::PauseLogic(const FString & Reason)
+{
+	UE_LOG(SHTNPlannerRuntime, Warning, TEXT("Execution updates: PAUSED (%s)"), *Reason);
+	bIsPaused = true;
+}
+
+EAILogicResuming::Type USHTNComponent::ResumeLogic(const FString & Reason)
+{
+	const EAILogicResuming::Type SuperResumeResult = Super::ResumeLogic(Reason);
+
+	bIsPaused = false;
+	
+	return SuperResumeResult;
+}
+
+bool USHTNComponent::IsRunning() const
+{
+	return !bIsPaused && bIsRunning;
+}
+
+bool USHTNComponent::IsPaused() const
+{
+	return bIsPaused;
+}
+
+void USHTNComponent::Cleanup()
+{
+	StopLogic("Cleanup");
+	SHTNOperators.Empty();
 }
 
 void USHTNComponent::GeneratePlan()
@@ -44,6 +115,12 @@ void USHTNComponent::GeneratePlan()
 
 void USHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction * ThisTickFunction)
 {
+	// If not running or paused return immedeatly
+	if (!bIsRunning || bIsPaused)
+	{
+		return;
+	}
+
 	// If there are no more tasks in the plan or if a task fails, a replan will be needed
 	// Abort any running tasks and set the operator to nullptr
 	if (bReplan)
