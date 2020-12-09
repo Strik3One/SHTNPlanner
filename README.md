@@ -19,6 +19,7 @@ To use the plugin, simply copy the folder `Plugins/SHTNPlanner` into your Projec
 Below you will find documentation for using the plugin in your own project. If you notice something is missing, or have additional question, feel free to shoot me a message.
 ## World State
 The WorldState gets automatically created once you run a planner on a `AIController`. The only thing you must do is provide an enum asset with the states your agent requires. 
+
 <img src="Resources/WorldStateExample.png" height=350>
 
 ### Functions
@@ -145,4 +146,4 @@ Primitive tasks don't always need to have an effect, as some tasks will not affe
 #### Running the network
 You can run the Network by calling `Run HTN Planner` and pass in the AIController on which you want this network to run.
 
-<img src="Resources/RunHTNPlanner.png" height=350>
+<img src="Resources/RunHTNPlanner.png">
