@@ -20,26 +20,26 @@ Below you will find documentation for using the plugin in your own project. If y
 ## World State
 The WorldState gets automatically created once you run a planner on a `AIController`. The only thing you must do is provide an enum asset with the states your agent requires. 
 
-<img src="Resources/WorldStateExample.png" height=350>
+<img src="Resources/WorldStateExample.png">
 
 ### Functions
 These functions can be called anywhere, but will require the Actor (that is running a planner) to be passed in at all times.
 > Beware! Whenever you change the WorldState through these functions it will force a replan. This means that syncing values every frame (such as health or stamina) will be extremely inefficient and might prevent the planner from executing its plan at all.
 --------------------------------
 #### `Set World State as Value` and `Set World State as Key Value`
-<img src="Resources/SetWorldStateAs.png" height=350>
+<img src="Resources/SetWorldStateAs.png">
 
 The difference between setting a state as value and as key value is that when setting as a key value, it will set the value of the given state to the value of the given key.
 
 --------------------------------
 #### `Get World State Value`
-<img src="Resources/GetWorldStateValue.png" height=350>
+<img src="Resources/GetWorldStateValue.png">
 
 Will return the value of the given WorldState key. If the key is invalid it will return a false boolean.
 > This function does not check if the passed in WorldState key is from the same enum as the actors WorldState. When using multiple networks and worldstates make sure to verify that the actor being passed in is of the expected class.
 --------------------------------
  #### `Change World State by Value` and `Change World State by Key Value`
-<img src="Resources/ChangeWorldStateBy.png" height=350>
+<img src="Resources/ChangeWorldStateBy.png">
 
  This node is a combination of previously mentioned functions and allows you to easily increase/decrease/set a WorldState value. 
 
@@ -57,7 +57,7 @@ In the window that will open you can select agents that are currently running an
 ## Operators
 Operators are where the behavior logic is defined. Just like the WorldState, to use Operators you must create an an Enum asset with the actions your agent can perform.
 
-<img src="Resources/OperatorsExample.png" height=350>
+<img src="Resources/OperatorsExample.png">
 
 To create an Operator class you must create a new Blueprint class that inherits from `SHTNOperator_BlueprintBase`
 
@@ -91,14 +91,14 @@ The network is where you will build the domain. The domain is a collection of co
 
 To create a network you must create a new Blueprint class that inherits from `SHTNNetwork_BlueprintBase`.  Then you must tell the network which Enum assets you want to use as WorldState and as Operator. You also need to tell the network which Operator class belongs to which Operator Enum in the `Operator Classes` array.
 
-<img src="Resources/NetworkDefaults.png" height=350>
+<img src="Resources/NetworkDefaults.png">
 
 ### Functions
 ---
 #### `Build HTN Domain`
 This function **needs** to be overriden in the network. This is where you will fill your network with tasks. The function does not take any arguments but will need to return a Domain and a boolean (if the domain building was succesfull or not). 
 
-<img src="Resources/BuildHTNDomain.png" height=350>
+<img src="Resources/BuildHTNDomain.png">
 
 You can use Unreal's 'Make ..." nodes to construct the Domain object
 
@@ -114,13 +114,13 @@ The HTN network consist of two different types of tasks: **Composite** and **Pri
 #### Composite Tasks
 Composite tasks are stored in a map in the domain object, where the key is the name of the task.
 
-<img src="Resources/CompositeMap.png" height=350>
+<img src="Resources/CompositeMap.png">
 
 Each composite task contains an array of methods which respectively contain an array of conditions and tasks. 
 >Tasks are specified with names, so be sure you dont make any typos (don't worry the network will throw an error if there are any tasks specified that don't exist in the network)
 
 #### Conditions
-<img src="Resources/Condition.png" height=350>
+<img src="Resources/Condition.png">
 
 When specifiying conditions you will need to specify the `Key Left Hand` with the WorldState key you want to perform the specified operation on. You can then either choose to compare this with the value of another key (pass in WorldState key to `Key Right Hand`) or just a passed in value.
 >If you don't want to use the `Key Right Hand` make sure the value of this is 255. If this value is anything less, the condition will try to use the key value (which might not exist).
@@ -131,16 +131,16 @@ When specifiying conditions you will need to specify the `Key Left Hand` with th
 #### Primitive Tasks
 Just like composites, primitive tasks are stored in a map in the domain object, where the key is the name of the task.
 
-<img src="Resources/PrimitiveMap.png" height=350>
+<img src="Resources/PrimitiveMap.png">
 
 The primitive tasks themselves require both the `Action ID` and `Parameter` to be specified. The `Action ID` is the enum value of your operator enum and the `Parameter` can be any value you want it to be, but usually will be an enum value from your WorldState.
 
-<img src="Resources/PrimitiveTask.png" height=350>
+<img src="Resources/PrimitiveTask.png">
 
 #### Effects
 Primitive tasks don't always need to have an effect, as some tasks will not affect the WorldState. Specifying an effect works the same way conditions do, the only difference being the operation.
 
-<img src="Resources/Effect.png" height=350>
+<img src="Resources/Effect.png">
 
 ---
 #### Running the network
