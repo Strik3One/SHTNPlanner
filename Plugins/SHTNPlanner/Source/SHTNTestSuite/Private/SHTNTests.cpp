@@ -38,6 +38,8 @@ struct FSHTNTestBase : public FAITestBase
 
 	void PopulateWorldState()
 	{
+		WorldState.Init(int32(ETestSHTNWorldState::MAX));
+
 		// Assign every key to their numerical index value - we assume this later on in the tests
 		for (int32 Index = 0; Index < int32(ETestSHTNWorldState::MAX); ++Index)
 		{
@@ -348,7 +350,9 @@ struct FAITest_SHTNEffects : public FSHTNTestBase
 	FAITest_SHTNEffects()
 	{
 		//Make sure the value of Ammo is 0
-		Test(TEXT("Worldstate should be initialized with 64 values"), WorldState.SetValue(FSHTNDefs::FWSKey(ETestSHTNWorldState::Ammo), 0));
+		Test(TEXT("Worldstate should be initialized with 0 values"), !WorldState.SetValue(FSHTNDefs::FWSKey(ETestSHTNWorldState::Ammo), 0));
+
+		WorldState.Init(int32(ETestSHTNWorldState::MAX));
 
 		for (int32 Value = 0; Value <= 5; ++Value)
 		{
@@ -426,6 +430,7 @@ struct FAITest_SHTNPlanning : public FSHTNTestBase
 		Test(TEXT("Planning with an empty domain should result in an empty plan"), Plan.TaskNames.Num() == 0);
 
 		PopulateDomain();
+		WorldState.Init(int32(ETestSHTNWorldState::MAX));
 
 		Planner.CreatePlan(Domain, WorldState, Plan);
 		Test(TEXT("Plan should be of lenght 2"), Plan.TaskNames.Num() == 2);
@@ -492,6 +497,7 @@ struct FAITest_SHTNPlanningRollback : public FSHTNTestBase
 		Domain.AddPrimitiveTask(TEXT("DummyPrimitive1"));
 		Domain.AddPrimitiveTask(TEXT("DummyPrimitive2"));
 
+		WorldState.Init(1);
 		Planner.CreatePlan(Domain, WorldState, Plan);
 
 		Test(TEXT("The plan should consist of one primitive task: DummyPrimitive2"), Plan.TaskNames.Num() == 1 && Plan.TaskNames[0] == TEXT("DummyPrimitive2"));
