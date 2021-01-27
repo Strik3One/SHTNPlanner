@@ -49,7 +49,7 @@ Will be called both during planning and execution. During planning this will be 
 >When this function is not implemented, the task return true by default upon condition checking
 -------------------------------
 #### `Get Score`
-Will be called if the composite task that contains this method is of type `Scored`.
+Will be called if the composite task that contains this task is of type `Scored`.
 
 --------------------------------
 #### `Receive Initialize Action`
