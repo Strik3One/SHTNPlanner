@@ -419,7 +419,7 @@ struct FAITest_SHTNEffects : public FSHTNTestBase
 IMPLEMENT_AI_LATENT_TEST(FAITest_SHTNEffects, "SHTN.Effects")
 
 ////////////////////////////////////////////////////////////////////////
-
+/*
 struct FAITest_SHTNPlanning : public FSHTNTestBase
 {
 	FAITest_SHTNPlanning()
@@ -452,9 +452,10 @@ struct FAITest_SHTNPlanning : public FSHTNTestBase
 	}
 };
 IMPLEMENT_AI_LATENT_TEST(FAITest_SHTNPlanning, "SHTN.Planning")
+*/
 
 //////////////////////////////////////////////////////////////////////////
-
+/*
 struct FAITest_SHTNPlanningRollback : public FSHTNTestBase
 {
 	FAITest_SHTNPlanningRollback()
@@ -504,3 +505,4 @@ struct FAITest_SHTNPlanningRollback : public FSHTNTestBase
 	}
 };
 IMPLEMENT_AI_LATENT_TEST(FAITest_SHTNPlanningRollback, "SHTN.PlanningRollback")
+*/

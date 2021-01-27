@@ -7,101 +7,8 @@
 #include "SHTNDomain.h"
 #include "SHTNNetwork_BlueprintBase.generated.h"
 
-// This class makes it easy for us to make a detail customisation so we can make a dropdown to select the Key from
-USTRUCT(BlueprintType)
-struct FUserDefinedWorldState
-{
-	GENERATED_BODY()
-
-		UPROPERTY(EditAnywhere, Category = "SHTN")
-		uint8 KeyValue;
-
-	bool operator==(const FUserDefinedWorldState& Rhs) const
-	{
-		return KeyValue == Rhs.KeyValue;
-	}
-
-	bool operator==(const uint8& Rhs) const
-	{
-		return KeyValue == Rhs;
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FWorldStateArrayElement
-{
-	GENERATED_BODY()
-
-		UPROPERTY(BlueprintReadWrite, Category = "SHTN")
-		uint8 WorldStateKey;
-
-	UPROPERTY(BlueprintReadWrite, Category = "SHTN")
-		int32 Value;
-
-	FWorldStateArrayElement()
-		: WorldStateKey(MAX_uint8), Value(0)
-	{}
-};
-
-USTRUCT(BlueprintType)
-struct FWorldStateElement
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, Category = "SHTN")
-	FUserDefinedWorldState WorldStateKey;
-
-	UPROPERTY(EditAnywhere, Category = "SHTN")
-	int32 Value;
-
-	FWorldStateElement(uint8 InKey = MAX_uint8, int32 InValue = 0)
-		: Value(InValue)
-	{
-		WorldStateKey.KeyValue = InKey;
-	}
-
-	FWorldStateElement(const FWorldStateArrayElement& InElement)
-		: FWorldStateElement(InElement.WorldStateKey, InElement.Value)
-	{
-	}
-
-	bool operator==(const uint8& Rhs) const
-	{
-		return WorldStateKey == Rhs;
-	}
-};
-
-// This class makes it easy for us to make a detail customisation so we can make a dropdown to select the Key from
-USTRUCT(BlueprintType)
-struct FUserDefinedOperator
-{
-	GENERATED_BODY()
-
-		UPROPERTY(EditAnywhere, Category = "SHTN")
-		uint8 KeyValue;
-
-	bool operator==(const FUserDefinedOperator& Rhs) const
-	{
-		return KeyValue == Rhs.KeyValue;
-	}
-
-	bool operator==(const uint8& Rhs) const
-	{
-		return KeyValue == Rhs;
-	}
-};
-
-USTRUCT(BlueprintType)
-struct FSHTNOperatorClassData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, Category = "SHTN")
-	FUserDefinedOperator OperatorKey;
-
-	UPROPERTY(EditAnywhere, Category = "SHTN")
-	TSubclassOf<class USHTNOperator_BlueprintBase> Class;
-};
+class UBlackboardData;
+class UBlackboardComponent;
 
 UCLASS(Blueprintable)
 class SHTNPLANNERRUNTIME_API USHTNNetwork_BlueprintBase : public UObject
@@ -110,24 +17,24 @@ class SHTNPLANNERRUNTIME_API USHTNNetwork_BlueprintBase : public UObject
 
 public:
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "SHTN")
-	TArray<FWorldStateElement> DefaultWorldState;
+	USHTNNetwork_BlueprintBase();
+
 
 	UPROPERTY(EditDefaultsOnly, Category = "SHTN")
-		UEnum* WorldStateEnumAsset;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "SHTN")
-		UEnum* OperatorEnumAsset;
+		UBlackboardData* WorldStateAsset;
 
 	UPROPERTY(EditDefaultsOnly, Category = "SHTN")
-		TArray<FSHTNOperatorClassData> OperatorClasses;
+		TArray<FName> IgnoredWorldStateValues;
+
+	UPROPERTY(EditDefaultsOnly, Category = "SHTN")
+		int32 MaxPlanCycles;
 
 	bool BuildNetwork(class USHTNComponent* HTNComponent);
 
 protected:
 
 	UFUNCTION(BlueprintNativeEvent)
-	bool ProceduralDefaultWorldState(class AAIController* AIOwner, class APawn* Pawn, TArray<FWorldStateArrayElement>& ProceduralWorldState);
+	bool SetDefaultWorldState(class AAIController* AIOwner, class APawn* Pawn, UBlackboardComponent* WorldState);
 
 	UFUNCTION(BlueprintNativeEvent)
 	bool BuildHTNDomain(FSHTNDomain& Domain);

@@ -14,6 +14,7 @@ USHTNComponent::USHTNComponent()
 	bReplan = true;
 	bIsPaused = false;
 	bIsRunning = true;
+	bCurrentExecutionSuccessful = true;
 }
 
 void USHTNComponent::StartLogic()
@@ -85,16 +86,38 @@ void USHTNComponent::Cleanup()
 	SHTNOperators.Empty();
 }
 
+void USHTNComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	WorkingWorldState->RemoveFromRoot();
+}
+
+EBlackboardNotificationResult USHTNComponent::OnBlackboardKeyValueChange(const UBlackboardComponent& Blackboard, FBlackboard::FKey ChangedKeyID)
+{
+	if (Blackboard.GetUniqueID() == BlackboardState->GetUniqueID())
+	{
+		bReplan = true;
+		return EBlackboardNotificationResult::ContinueObserving;
+	}
+
+	return EBlackboardNotificationResult::RemoveObserver;
+
+}
+
 void USHTNComponent::GeneratePlan()
 {
 	if (Domain.IsValid())
 	{
-		Planner.CreatePlan(Domain, WorldState, Plan);
+		WorkingWorldState->SetValueMemory(BlackboardState->GetValueMemory());
+		Planner.CreatePlan(Domain, WorkingWorldState, Plan);
+		DebugTaskNames = Plan.TaskNames;
+
+		OnNewPlanMade.Broadcast();
+	
 		bReplan = false;
 
 		if (Plan.TaskNames.Num() > 0)
 		{
-			UE_LOG(SHTNPlannerRuntime, Log, TEXT("Plan result for: %s"), *AIOwner->GetPawn()->GetActorLabel());
+			UE_LOG(SHTNPlannerRuntime, Log, TEXT("Plan result for: %s with %i cycles"), *AIOwner->GetPawn()->GetActorLabel(), Plan.Cycles);
 			UE_LOG(SHTNPlannerRuntime, Log, TEXT("----------------------------------------"));
 			for (int32 TaskIndex = 0; TaskIndex < Plan.TaskNames.Num(); ++TaskIndex)
 			{
@@ -105,6 +128,8 @@ void USHTNComponent::GeneratePlan()
 		else
 		{
 			UE_LOG(SHTNPlannerRuntime, Error, TEXT("Failed to find plan for: %s"), *AIOwner->GetPawn()->GetActorLabel());
+
+			//TODO: More detailed errors on failed plan
 		}
 	}
 	else
@@ -127,8 +152,32 @@ void USHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	{
 		if (CurrentOperator)
 		{
-			CurrentOperator->Abort(AIOwner, CurrentTask.Parameter);
-			CurrentOperator = nullptr;
+			// First check if the Operator has somehow succeeded whilst we are requesting a replan
+			// This can occure if the operator succeeds in the same frame as it wants to replan
+			// But also when the user decides the task succeeded whilst aborting it
+			// If this is the case we still want to apply the effects as the user is expecting these to be applied upon calling FinishExecute(bSuccess = true)
+			if (CurrentOperator->GetResult() == ESHTNOperatorResult::Success)
+			{
+				// This sets the activation of the operator to false - next time we need this operator it will be reintialized
+				CurrentOperator->Terminate();
+
+				BlackboardState->PauseObserverNotifications();
+				CurrentOperator->ApplyEffects(BlackboardState, CurrentTask.Parameter, false);
+				BlackboardState->ResumeObserverNotifications(false);
+
+				CurrentOperator = nullptr;
+			}
+			else
+			{
+				CurrentOperator->Abort(AIOwner, CurrentTask.Parameter);
+
+				if (CurrentOperator->GetResult() != ESHTNOperatorResult::Aborted)
+				{
+					return;
+				}
+
+				CurrentOperator = nullptr;
+			}
 		}
 
 		GeneratePlan();
@@ -140,9 +189,16 @@ void USHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 	{
 		if (Plan.TaskSequence.Num() > 0)
 		{
-			CurrentTask = Plan.TaskSequence[0];
-			Plan.TaskSequence.RemoveAt(0);
-			CurrentOperator = SHTNOperators[(uint8)CurrentTask.ActionID];
+			Plan.GetNextTask(CurrentTask, CurrentTaskName);
+			CurrentOperator = CurrentTask.ActionPtr;
+
+			if (!CurrentOperator->CheckCondition(BlackboardState, (uint8)CurrentTask.Parameter))
+			{
+				bReplan = true;
+				CurrentOperator = nullptr;
+				UE_LOG(SHTNPlannerRuntime, Log, TEXT("%s is replanning due failed condition at runtime..."), *AIOwner->GetPawn()->GetActorLabel());
+				return;
+			}
 		}
 		else
 		{
@@ -159,6 +215,7 @@ void USHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		if (!CurrentOperator->IsActivated())
 		{
 			CurrentOperator->Initialize(AIOwner, (uint8)CurrentTask.Parameter);
+			bCurrentExecutionSuccessful = true;
 		}
 
 		// As long as the operator is InProgress, execute and return
@@ -171,19 +228,19 @@ void USHTNComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		else if(CurrentOperator->GetResult() == ESHTNOperatorResult::Failed)
 		{
 			bReplan = true;
-			UE_LOG(SHTNPlannerRuntime, Log, TEXT("%s is replanning due to failed operator result..."), *AIOwner->GetPawn()->GetActorLabel());
+			bCurrentExecutionSuccessful = false;
+			UE_LOG(SHTNPlannerRuntime, Log, TEXT("%s is replanning due to failed operator result of: %s with parameter %i"), *AIOwner->GetPawn()->GetActorLabel(), *CurrentOperator->CDOName.ToString(), CurrentTask.Parameter);
 		}
 
 		// This sets the activation of the operator to false - next time we need this operator it will be reintialized
 		CurrentOperator->Terminate();
 
-		// Here we will get the actual effects of this operator and apply it to the world state
-		TArray<FSHTNWorldStateEffect> ActualEffects;
-		CurrentOperator->GetActualEffects(ActualEffects, AIOwner);
-
-		for (const auto& Effect : ActualEffects)
+		if (bCurrentExecutionSuccessful)
 		{
-			WorldState.ApplyEffect(FSHTNEffect(Effect.WSKey, Effect.Operation).SetRHSAsValue(Effect.Value));
+			//Pause observers and apply effectsm then resume observing without broadcasting the changed values in the effects.
+			BlackboardState->PauseObserverNotifications();
+			CurrentOperator->ApplyEffects(BlackboardState, CurrentTask.Parameter, false);
+			BlackboardState->ResumeObserverNotifications(false);
 		}
 
 		// Setting the operator to null to start the circle of finding a new task

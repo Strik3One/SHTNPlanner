@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/ObjectMacros.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "SHTNDomain.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(SHTNPlannerRuntime, Log, All);
@@ -47,6 +48,37 @@ enum class ESHTNWorldStateOperation : uint8
 	MAX UMETA(Hidden)
 };
 
+UENUM()
+enum class ESHTNLogicalOperators : uint8
+{
+	AND,
+	OR,
+
+	MAX UMETA(Hidden)
+};
+
+UENUM()
+enum class ESHTNCompositeType : uint8
+{
+	Default,
+	Scored,
+
+	MAX UMETA(Hidden)
+};
+
+UCLASS()
+class SHTNPLANNERRUNTIME_API UWorldStateComponent : public UBlackboardComponent
+{
+	GENERATED_BODY()
+
+public:
+
+	TArray<uint8> GetValueMemory() const { return ValueMemory; }
+
+	void SetValueMemory(TArray<uint8> InMemory) { ValueMemory = InMemory; }
+
+};
+
 USTRUCT(BlueprintType)
 struct FSHTNCondition
 {
@@ -63,6 +95,9 @@ struct FSHTNCondition
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Value;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ESHTNLogicalOperators LogicalRelationToNextCondition;
 
 	FSHTNCondition(const uint8 InKeyLeftHand = FSHTNDefs::InvalidWSKey, const ESHTNWorldStateCheck InOperation = ESHTNWorldStateCheck::MAX)
 		: Operation(InOperation), KeyLeftHand(InKeyLeftHand), KeyRightHand(FSHTNDefs::InvalidWSKey), Value(0)
@@ -149,19 +184,33 @@ struct FSHTNEffect
 	bool IsValid() const { return (Operation != ESHTNWorldStateOperation::MAX); }
 };
 
+class USHTNOperator_BlueprintBase;
+
 USTRUCT(BlueprintType)
 struct SHTNPLANNERRUNTIME_API FSHTNPrimitiveTask
 {
 	GENERATED_BODY()
 
 	// We call the Action ID and the parameter together the "Operator"
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 ActionID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<USHTNOperator_BlueprintBase> Action;
+
+	USHTNOperator_BlueprintBase* ActionPtr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	uint8 Parameter;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	void SetScore(float InScore)
+	{
+		Score = InScore;
+	}
+
+	float Score;
+
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FSHTNEffect> Effects;
 
 	void SetOperator(const uint8 InActionID, const uint8 InParameter)
@@ -185,7 +234,7 @@ struct SHTNPLANNERRUNTIME_API FSHTNMethod
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FSHTNCondition> Conditions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -213,6 +262,9 @@ struct SHTNPLANNERRUNTIME_API FSHTNCompositeTask
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FSHTNMethod> Methods;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ESHTNCompositeType Type;
 
 	int32 FindSatisfiedMethod(const FSHTNWorldState& WorldState, const int32 StartIndex = 0) const;
 
@@ -248,7 +300,10 @@ struct SHTNPLANNERRUNTIME_API FSHTNDomain
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<FName, FSHTNPrimitiveTask> PrimitiveTasks;
-	
+
+	int32 MaxPlanCycles;
+
+	void SortMethodsByTaskType(FSHTNCompositeTask& Task, UWorldStateComponent* WorldState);
 
 	FSHTNPrimitiveTask& AddPrimitiveTask(const FName& TaskName)
 	{
@@ -267,7 +322,18 @@ struct SHTNPLANNERRUNTIME_API FSHTNDomain
 		return *PrimitiveTasks.Find(TaskName);
 	}
 
+	FSHTNPrimitiveTask& GetPrimitiveTask(const FName& TaskName)
+	{
+		return *PrimitiveTasks.Find(TaskName);
+	}
+
+
 	const FSHTNCompositeTask& GetCompositeTask(const FName& TaskName) const
+	{
+		return *CompositeTasks.Find(TaskName);
+	}
+
+	FSHTNCompositeTask& GetCompositeTask(const FName& TaskName)
 	{
 		return *CompositeTasks.Find(TaskName);
 	}
@@ -301,17 +367,7 @@ struct SHTNPLANNERRUNTIME_API FSHTNWorldState
 	void Init(const uint32 NewWorldStateSize = 64);
 
 	bool CheckCondition(const FSHTNCondition& Condition) const;
-	FORCEINLINE bool CheckConditions(const TArray<FSHTNCondition>& Conditions) const
-	{
-		for (int32 ConditionIndex = 0; ConditionIndex < Conditions.Num(); ++ConditionIndex)
-		{
-			if (CheckCondition(Conditions[ConditionIndex]) == false)
-			{
-				return false;
-			}
-		}
-		return true;
-	}
+	bool CheckConditions(const TArray<FSHTNCondition>& Conditions) const;
 
 	void ApplyEffect(const FSHTNEffect& Effect);
 	FORCEINLINE void ApplyEffects(const TArray<FSHTNEffect>& Effects)
@@ -339,3 +395,4 @@ struct SHTNPLANNERRUNTIME_API FSHTNWorldState
 protected:
 	TArray<FSHTNDefs::FWSValue> Values;
 };
+

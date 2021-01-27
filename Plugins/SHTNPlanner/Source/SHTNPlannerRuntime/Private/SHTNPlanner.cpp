@@ -1,12 +1,15 @@
 #include "SHTNPlanner.h"
+#include "SHTNOperator_BlueprintBase.h"
 
 //---------------------------------//
 //	SHTNPlan
 //--------------------------------//
 
-void FSHTNPlan::Set(const FSHTNDomain& Domain, const TArray<FName>& NameSequence)
+void FSHTNPlan::Set(const FSHTNDomain& Domain, const TArray<FName>& NameSequence, int32 InCycles)
 {
 	TaskNames = NameSequence;
+	Cycles = InCycles;
+
 	TaskSequence.Reset();
 
 	for (const FName Name : NameSequence)
@@ -28,47 +31,77 @@ FSHTNPlanner::FSHTNPlanner()
 
 }
 
-bool FSHTNPlanner::CreatePlan(const FSHTNDomain & Domain, const FSHTNWorldState & InitialWordState, FSHTNPlan & OutPlan)
+bool FSHTNPlanner::CreatePlan(FSHTNDomain & Domain, UWorldStateComponent* WorkingWorldState, FSHTNPlan & OutPlan)
 {
 	// Reset everything that is needed and copy the IntialWordstate to the CurrentState.
 	OutPlan.Reset();
 	Reset();
-	new(&CurrentState) FSHTNDecompState(InitialWordState);
+	new(&CurrentState) FSHTNDecompState(*WorkingWorldState);
+
+	WorldState = WorkingWorldState;
 
 	// Begin at the root task of the domain.
-	TasksToProcess.Push(Domain.RootTaskName);
+	CurrentState.TasksToProcess.Push(Domain.RootTaskName);
 
 	// As we decompose states and rollback to composites. We don't want to search the same method again, so it's important to increment this at decomposition
 	int32 NextMethod = 0;
 
-	// As long as there still are tasks to process we haven't reached the end of a plan and we will keep planning
-	while (TasksToProcess.Num() > 0)
+	int32 PlanCycles = 0;
+
+	while (CurrentState.TasksToProcess.Num() > 0 && PlanCycles++ < Domain.MaxPlanCycles)
 	{
+		//++PlanCycles;
 
-		const FName CurrentTaskName = TasksToProcess.Pop(false);
+		const FName CurrentTaskName = CurrentState.TasksToProcess.Pop(false);
 
+		// If the current method is a Composite task, we should decompose the task into it's subtask.
+		// We start with the first method, and through decomposition and restoring upon failed conditions we will explore all methods.
 		if (Domain.IsCompositeTask(CurrentTaskName))
 		{
-			// If the CurrentTask is a composite we will look if this composite has any methods which conditions are met
-			const FSHTNCompositeTask& CompositeTask = Domain.GetCompositeTask(CurrentTaskName);
-			const int32 MethodIndex = CompositeTask.FindSatisfiedMethod(CurrentWorldState(), NextMethod);
+			FSHTNCompositeTask& CompositeTask = Domain.GetCompositeTask(CurrentTaskName);
 
+			Domain.SortMethodsByTaskType(CompositeTask, WorldState);
 
-			if (MethodIndex != INDEX_NONE)
+			if (NextMethod < CompositeTask.Methods.Num())
 			{
-				// If there was a method found (index returned is not INDEX_NONE) we record this decomposition
-				const FSHTNMethod& Method = CompositeTask.Methods[MethodIndex];
-				RecordDecomposition(CurrentTaskName, MethodIndex);
+				const FSHTNMethod& Method = CompositeTask.Methods[NextMethod];
 
-				// Set the NextMethod back to 0 to make sure we start at the first method of the next composite task we encounter
+				RecordDecomposition(CurrentTaskName, NextMethod);
+
 				NextMethod = 0;
 
-				// Push the tasks defined in the Method to the tasks that need to be processed
-				// We loop backwards because the process list in Last in First out (LiFo). And as the method defines its tasks FiFo we need to swap it around
+				// Add the tasks from the last one to the first as we use pop the last element off the array each cycle.
 				for (int32 TaskIndex = Method.Tasks.Num() - 1; TaskIndex >= 0; --TaskIndex)
 				{
-					TasksToProcess.Push(Method.Tasks[TaskIndex]);
+					CurrentState.TasksToProcess.Push(Method.Tasks[TaskIndex]);
 				}
+			}
+			else if (CanRollBack())
+			{
+				// If there wasn't a method found and there are decomposed states in the stack (CanRollBack() returns true) we will rollback to the last known state
+				RestoreDecomposition();
+
+				// Increment the NextMethod to make sure we don't fall back into the same method and end up in an infinite loop
+				NextMethod = GetMethodIndex() + 1;
+				CurrentState.TasksToProcess.Push(GetActiveTask());
+			}
+			else
+			{
+				break;
+			}
+		}
+		else if (Domain.IsPrimitiveTask(CurrentTaskName))
+		{
+			// If the CurrentTask is a primitive, we need to check its conditions against the current WorldState.
+			// If the conditions return true we will apply the effects and add the task to the plan
+			const FSHTNPrimitiveTask& PrimitiveTask = Domain.GetPrimitiveTask(CurrentTaskName);
+
+			if (PrimitiveTask.ActionPtr->CheckCondition(WorldState, PrimitiveTask.Parameter, true))
+			{
+
+				PrimitiveTask.ActionPtr->ApplyEffects(WorldState, PrimitiveTask.Parameter, true);
+				
+				AddToPlan(CurrentTaskName);
 			}
 			else if (CanRollBack())
 			{
@@ -76,24 +109,19 @@ bool FSHTNPlanner::CreatePlan(const FSHTNDomain & Domain, const FSHTNWorldState 
 				RestoreDecomposition();
 				// Increment the NextMethod to make sure we don't fall back into the same method and end up in an infinite loop
 				NextMethod = GetMethodIndex() + 1;
-				TasksToProcess.Push(GetActiveTask());
+				CurrentState.TasksToProcess.Push(GetActiveTask());
 			}
-		}
-		else if (Domain.IsPrimitiveTask(CurrentTaskName))
-		{
-			// If the CurrentTask is a primitive, there isn't much magic involed. Just get the task, apply the effects (for further condition checking in the plan)
-			// And finally add the primitive to the Plan
-			const FSHTNPrimitiveTask& PrimitiveTask = Domain.GetPrimitiveTask(CurrentTaskName);
-			CurrentWorldState().ApplyEffects(PrimitiveTask.Effects);
-			AddToPlan(CurrentTaskName);
+			else
+			{
+				break;
+			}
 		}
 	}
 
-
-	bool bPlanningSuccessful = (TasksToProcess.Num() == 0);
+	bool bPlanningSuccessful = (CurrentState.TasksToProcess.Num() == 0);
 	if (bPlanningSuccessful)
 	{
-		OutPlan.Set(Domain, GetPlan());
+		OutPlan.Set(Domain, GetPlan(), PlanCycles);
 	}
 
 	return bPlanningSuccessful;

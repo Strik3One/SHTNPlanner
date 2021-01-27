@@ -7,6 +7,8 @@
 #include "SHTNOperator_BlueprintBase.h"
 #include "SHTNComponent.h"
 
+#include "BehaviorTree/BlackboardComponent.h"
+
 
 
 bool USHTNControllerLibrary::RunHTNPlanner(AAIController* AIController, TSubclassOf<USHTNNetwork_BlueprintBase> HTNNetwork)
@@ -22,185 +24,120 @@ bool USHTNControllerLibrary::RunHTNPlanner(AAIController* AIController, TSubclas
 		UE_LOG(SHTNPlannerRuntime, Error, TEXT("RunHTNPlanner: Can't run the planner on a NULL Network"));
 		return false;
 	}
-	else if (HTNNetwork.GetDefaultObject()->WorldStateEnumAsset == NULL)
+	else if (HTNNetwork.GetDefaultObject()->WorldStateAsset == NULL)
 	{
-		UE_LOG(SHTNPlannerRuntime, Error, TEXT("RunHTNPlanner: Can't run the planner with a NULL WorldStateEnumAsset"));
-		return false;
-	}
-	else if (HTNNetwork.GetDefaultObject()->OperatorEnumAsset == NULL)
-	{
-		UE_LOG(SHTNPlannerRuntime, Error, TEXT("RunHTNPlanner: Can't run the planner with a NULL OperatorEnumAsset"));
+		UE_LOG(SHTNPlannerRuntime, Error, TEXT("RunHTNPlanner: Can't run the planner with a NULL WorldStateAsset"));
 		return false;
 	}
 
-	// See if there is already a SHTNComponent as BrainComponent 
-	// If not, create a new one and assign it
-	USHTNComponent* SHTNComp = Cast<USHTNComponent>(AIController->BrainComponent);
-	if (SHTNComp == NULL)
+	bool bSuccess = true;
+
+	// see if need a blackboard component at all
+	UBlackboardComponent* WorldStateComp = Cast<UWorldStateComponent>(AIController->GetBlackboardComponent());
+	USHTNNetwork_BlueprintBase* HTNAsset = HTNNetwork.GetDefaultObject();
+
+	if (HTNAsset->WorldStateAsset && (WorldStateComp == nullptr || WorldStateComp->IsCompatibleWith(HTNAsset->WorldStateAsset) == false))
 	{
-		UE_LOG(SHTNPlannerRuntime, Log, TEXT("RunHTNPlanner: Spawning new SHTNComponent..."));
-
-		SHTNComp = NewObject<USHTNComponent>(AIController, TEXT("SHTNComponent"));
-
-		SHTNComp->RegisterComponent();
-
-		SHTNComp->OwningPawnName = AIController->GetPawn()->GetFName();
+		// Make sure we have our extended blackboard class as the blackboard component so we can access the valuememory during planning
+		if (WorldStateComp == nullptr)
+		{
+			WorldStateComp = NewObject<UWorldStateComponent>(AIController, TEXT("WorldStateComponent"));
+			WorldStateComp->RegisterComponent();
+		}
+		
+		bSuccess = AIController->UseBlackboard(HTNAsset->WorldStateAsset, WorldStateComp);
 	}
-
-	// Make sure the object was created succesfully
-	check(SHTNComp != NULL);
-
-	AIController->BrainComponent = SHTNComp;
-	   
-	if (USHTNControllerLibrary::SetupSHTNComponent(SHTNComp, HTNNetwork.GetDefaultObject()))
-	{
-		return true;
-	}
-	else
-	{
-		SHTNComp->UnregisterComponent();
-		AIController->BrainComponent = nullptr;
-		return false;
-	}
-}
-
-void USHTNControllerLibrary::SetWorldStateAsValue(AActor * Target, uint8 WorldStateKey, int32 Value)
-{
-	USHTNComponent* SHTNComp = GetSHTNComponent(Target);
-
-	if (SHTNComp == nullptr)
-	{
-		return;
-	}
-
-	if (SHTNComp->WorldState.SetValue(WorldStateKey, Value))
-	{
-		SHTNComp->bReplan = true;
-	}
-}
-
-void USHTNControllerLibrary::SetWorldStateAsKeyValue(AActor * Target, uint8 WorldStateKey, uint8 Key)
-{
-	USHTNComponent* SHTNComp = GetSHTNComponent(Target);
-
-	if (SHTNComp == nullptr)
-	{
-		return;
-	}
-
-	int32 Value;
-	if (!SHTNComp->WorldState.GetValue(Key, Value))
-	{
-		return;
-	}
-	
-	if (SHTNComp->WorldState.SetValue(WorldStateKey, Value))
-	{
-		SHTNComp->bReplan = true;
-	}
-}
-
-void USHTNControllerLibrary::ChangeWorldStateByValue(AActor * Target, ESHTNWorldStateOperation Operation, uint8 WorldStateKey, int32 Value)
-{
-	if (Operation == ESHTNWorldStateOperation::Set)
-	{
-		SetWorldStateAsValue(Target, WorldStateKey, Value);
-		return;
-	}
-	
-	int32 CurrentWSValue;
-	bool bSuccess;
-
-	GetWorldStateValue(Target, WorldStateKey, CurrentWSValue, bSuccess);
 
 	if (bSuccess)
 	{
-		if (Operation == ESHTNWorldStateOperation::Increase)
+		// See if there is already a SHTNComponent as BrainComponent 
+		// If not, create a new one and assign it
+		USHTNComponent* SHTNComp = Cast<USHTNComponent>(AIController->BrainComponent);
+		if (SHTNComp == NULL)
 		{
-			SetWorldStateAsValue(Target, WorldStateKey, CurrentWSValue + Value);
+			UE_LOG(SHTNPlannerRuntime, Log, TEXT("RunHTNPlanner: Spawning new SHTNComponent..."));
+
+			SHTNComp = NewObject<USHTNComponent>(AIController, TEXT("SHTNComponent"));
+
+			SHTNComp->RegisterComponent();
+
+			SHTNComp->OwningPawnName = AIController->GetPawn()->GetFName();
+
+			SHTNComp->BlackboardState = Cast<UWorldStateComponent>(WorldStateComp);
+
+			SHTNComp->WorkingWorldState = NewObject<UWorldStateComponent>(SHTNComp, TEXT("WorkingWorldState"));
+			SHTNComp->WorkingWorldState->AddToRoot();
+
+			// Dupe a new asset and disable the instance syncing so when an instance synced value is updated during planning it doesn't sync with the active blackboards.
+			UBlackboardData* BBData = DuplicateObject<UBlackboardData>(WorldStateComp->GetBlackboardAsset(), SHTNComp->WorkingWorldState);
+			
+			for (auto& Key : BBData->Keys)
+			{
+				Key.bInstanceSynced = false;
+			}
+
+			SHTNComp->WorkingWorldState->InitializeBlackboard(*BBData);
+			SHTNComp->WorkingWorldState->PauseObserverNotifications();
 		}
-		else // Operation == Decrease
+
+		// Make sure the object was created succesfully
+		check(SHTNComp != NULL);
+
+		AIController->BrainComponent = SHTNComp;
+
+		if (USHTNControllerLibrary::SetupSHTNComponent(SHTNComp, HTNAsset))
 		{
-			SetWorldStateAsValue(Target, WorldStateKey, CurrentWSValue - Value);
+			return true;
+		}
+		else
+		{
+			SHTNComp->UnregisterComponent();
+			AIController->BrainComponent = nullptr;
+			return false;
 		}
 	}
-}
 
-void USHTNControllerLibrary::ChangeWorldStateByKeyValue(AActor * Target, ESHTNWorldStateOperation Operation, uint8 WorldStateKey, uint8 Key)
-{
-	if (Operation == ESHTNWorldStateOperation::Set)
-	{
-		SetWorldStateAsKeyValue(Target, WorldStateKey, Key);
-		return;
-	}
-
-	int32 CurrentWSValue, KeyValue;
-	bool bSuccessWS, bSuccessKey;
-
-	GetWorldStateValue(Target, WorldStateKey, CurrentWSValue, bSuccessWS);
-	GetWorldStateValue(Target, Key, KeyValue, bSuccessKey);
-
-	if (bSuccessWS && bSuccessKey)
-	{
-		if (Operation == ESHTNWorldStateOperation::Increase)
-		{
-			SetWorldStateAsValue(Target, WorldStateKey, CurrentWSValue + KeyValue);
-		}
-		else // Operation == Decrease
-		{
-			SetWorldStateAsValue(Target, WorldStateKey, CurrentWSValue - KeyValue);
-		}
-	}
-}
-
-void USHTNControllerLibrary::GetWorldStateValue(AActor * Target, uint8 WorldStateKey, int32 & Value, bool & bSuccess)
-{
-	USHTNComponent* SHTNComp = GetSHTNComponent(Target);
-
-	if (SHTNComp == nullptr)
-	{
-		bSuccess = false;
-		return;
-	}
-
-	bSuccess = SHTNComp->WorldState.GetValue(WorldStateKey, Value);
+	return bSuccess;
 }
 
 bool USHTNControllerLibrary::SetupSHTNComponent(USHTNComponent * SHTNComp, USHTNNetwork_BlueprintBase * HTNNetwork)
 {
-	SHTNComp->WorldStateEnumAsset = HTNNetwork->WorldStateEnumAsset;
-	SHTNComp->WorldState.Init(SHTNComp->WorldStateEnumAsset->NumEnums());
-
-	bool bSuccess = true;
-
-	SHTNComp->SHTNOperators.Empty();
-
-	for (int32 i = 0 ; i < HTNNetwork->OperatorClasses.Num(); i++)
-	{
-		const auto& OperatorClass = HTNNetwork->OperatorClasses[i];
-
-		if (OperatorClass.Class == NULL)
-		{
-			UE_LOG(SHTNPlannerRuntime, Error, TEXT("RunHTNPlanner: Operator Key at Index %i does not have an Operator Class assigned"), i);
-			bSuccess = false;
-		}
-		else 
-		{
-			SHTNComp->SHTNOperators.Add(OperatorClass.OperatorKey.KeyValue, NewObject<USHTNOperator_BlueprintBase>(SHTNComp, OperatorClass.Class));
-		}
-	}
-
-	if (!bSuccess)
-	{
-		return false;
-	}
-
 	if (!HTNNetwork->BuildNetwork(SHTNComp))
 	{
 		return false;
 	}
 	else
 	{
+		SHTNComp->SHTNOperators.Empty();
+
+		for (auto& Elem : SHTNComp->Domain.PrimitiveTasks)
+		{
+			//First check if this Action already has an object, if so - only set the index.
+			// If not,then create the now object and set the index.
+			FName ElementCDOName = Elem.Value.Action.GetDefaultObject()->GetFName();
+			int32 Index = SHTNComp->SHTNOperators.IndexOfByPredicate([ElementCDOName](const USHTNOperator_BlueprintBase* Object) {return ElementCDOName == Object->CDOName; });
+
+			if (Index >= 0)
+			{
+				Elem.Value.ActionPtr = SHTNComp->SHTNOperators[Index];
+			}
+			else
+			{
+				Elem.Value.ActionPtr = SHTNComp->SHTNOperators.Add_GetRef(NewObject<USHTNOperator_BlueprintBase>(SHTNComp, Elem.Value.Action));
+				Elem.Value.ActionPtr->Init(SHTNComp->GetWorld(), ElementCDOName);
+			}
+		}
+
+		const int32 NumKeys = SHTNComp->BlackboardState->GetNumKeys();
+
+		for (int32 i = 0; i < NumKeys; ++i)
+		{
+			if (HTNNetwork->IgnoredWorldStateValues.Contains(SHTNComp->BlackboardState->GetKeyName(i)) == false)
+			{
+				SHTNComp->BlackboardState->RegisterObserver(i, SHTNComp, FOnBlackboardChangeNotification::CreateUObject(SHTNComp, &USHTNComponent::OnBlackboardKeyValueChange));
+			}
+		}
+
 		return SHTNComp->Domain.Validate();
 	}
 }

@@ -4,8 +4,6 @@
 
 #include "Modules/ModuleManager.h"
 
-#include "DetailCustomizations/UserDefinedWorldStateDetails.h"
-#include "DetailCustomizations/UserDefinedOperatorDetails.h"
 #include "DetailCustomizations/WorldStateDebugDetails.h"
 #include "PropertyEditorModule.h"
 #include "LevelEditor.h"
@@ -18,9 +16,6 @@ DEFINE_LOG_CATEGORY(SHTNPlannerEditor);
 void FSHTNPlannerEditor::StartupModule()
 {
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
-	PropertyModule.RegisterCustomPropertyTypeLayout("UserDefinedWorldState", FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FUserDefinedWorldStateDetails::MakeInstance));
-	PropertyModule.RegisterCustomPropertyTypeLayout("UserDefinedOperator", FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FUserDefinedOperatorDetails::MakeInstance));
-
 	PropertyModule.RegisterCustomClassLayout("WorldStateDebugTool", FOnGetDetailCustomizationInstance::CreateStatic(&FWorldStateDebugDetails::MakeInstance));
 
 	{
@@ -56,8 +51,6 @@ void FSHTNPlannerEditor::ShutdownModule()
 	if (FModuleManager::Get().IsModuleLoaded("PropertyEditor"))
 	{
 		FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
-		PropertyModule.UnregisterCustomPropertyTypeLayout("UserDefinedWorldState");
-		PropertyModule.UnregisterCustomPropertyTypeLayout("UserDefinedOperator");
 		PropertyModule.NotifyCustomizationModuleChanged();
 	}
 }
@@ -72,6 +65,7 @@ void FSHTNPlannerEditor::TriggerWorldStateDebug()
 	ObjectsToView.Add(ToolInstance);
 	
 	TSharedRef<SWindow> Window = PropertyModule.CreateFloatingDetailsView(ObjectsToView, false);
+	Window->SetTitle(FText::FromString("SHTN WorldState Debug"));
 
 	Window->SetOnWindowClosed(FOnWindowClosed::CreateStatic(&FSHTNPlannerEditor::OnToolWindowClosed, ToolInstance));
 }

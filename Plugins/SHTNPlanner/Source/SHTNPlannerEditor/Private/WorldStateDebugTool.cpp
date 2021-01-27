@@ -21,8 +21,13 @@ void UWorldStateDebugTool::OnCreation(FWorldStateDebugDetails* DebugDetails)
 	// Always save the new pointer to the details as this object get recreated
 	DetailBuilderPtr = DebugDetails;
 
-	if (IsTemplate() || bCreated)
+	if (bCreated)
 	{
+		if (SelectedComponent)
+		{
+			OnNewPlanMadeHandle = SelectedComponent->OnNewPlanMade.AddSP(DebugDetails, &FWorldStateDebugDetails::OnNewPlanMade);
+		}
+
 		return;
 	}
 
@@ -44,6 +49,8 @@ void UWorldStateDebugTool::OnCreation(FWorldStateDebugDetails* DebugDetails)
 		{
 			SelectedComponent = HTNComponents[0];
 			CurrentIndex = 0;
+
+			OnNewPlanMadeHandle = SelectedComponent->OnNewPlanMade.AddSP(DebugDetails, &FWorldStateDebugDetails::OnNewPlanMade);
 		}
 	}
 }

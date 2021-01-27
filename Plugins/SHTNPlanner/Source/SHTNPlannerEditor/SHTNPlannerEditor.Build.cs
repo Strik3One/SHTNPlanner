@@ -46,6 +46,8 @@ public class SHTNPlannerEditor : ModuleRules
                 "AIModule",
                 "PropertyEditor",
                 "UnrealEd",
+                "BehaviorTreeEditor",
+                "GraphEditor",
                 "SHTNPlannerRuntime"
             }
 			);

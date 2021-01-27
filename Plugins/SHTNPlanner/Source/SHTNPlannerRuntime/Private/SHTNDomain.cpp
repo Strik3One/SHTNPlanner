@@ -2,6 +2,7 @@
 
 
 #include "SHTNDomain.h"
+#include "SHTNOperator_BlueprintBase.h"
 
 DEFINE_LOG_CATEGORY(SHTNPlannerRuntime);
 
@@ -37,8 +38,26 @@ bool FSHTNDomain::Validate(bool bDebug)
 	{
 		for (const FSHTNMethod& Method : CompositeTask.Methods)
 		{
+			bool FirstTask = true;
+
 			for (const FName& Task : Method.Tasks)
 			{
+				if (FirstTask)
+				{
+					FirstTask = false;
+
+					if (CompositeTask.Type == ESHTNCompositeType::Scored)
+					{
+						if (!IsPrimitiveTask(Task))
+						{
+							bValid = false;
+							UE_LOG(SHTNPlannerRuntime, Error, TEXT("Task %s is expected to be primitive due to owning Composite being of type 'Scored'"), *Task.ToString());
+
+							continue;
+						}
+					}
+				}
+
 				if (!(IsPrimitiveTask(Task) || IsCompositeTask(Task)))
 				{
 					bValid = false;
@@ -55,6 +74,27 @@ bool FSHTNDomain::Validate(bool bDebug)
 	bIsValid = bValid;
 
 	return bValid;
+}
+
+void FSHTNDomain::SortMethodsByTaskType(FSHTNCompositeTask& Task, UWorldStateComponent* WorldState)
+{
+	if (Task.Type == ESHTNCompositeType::Default)
+	{
+		return;
+	}
+
+	for (const FSHTNMethod& Method : Task.Methods)
+	{
+		FSHTNPrimitiveTask& PrimitiveTask = GetPrimitiveTask(Method.Tasks[0]);
+		PrimitiveTask.Score = PrimitiveTask.ActionPtr->GetScores(WorldState, PrimitiveTask.Parameter);
+	}
+
+	Task.Methods.Sort([this](const FSHTNMethod LHS, const FSHTNMethod RHS) {
+		const FSHTNPrimitiveTask& LHSPrimitiveTask = GetPrimitiveTask(LHS.Tasks[0]);
+		const FSHTNPrimitiveTask& RHSPrimitiveTask = GetPrimitiveTask(RHS.Tasks[0]);
+
+		return LHSPrimitiveTask.Score > RHSPrimitiveTask.Score;
+	});
 }
 
 int32 FSHTNCompositeTask::FindSatisfiedMethod(const FSHTNWorldState & WorldState, const int32 StartIndex) const
@@ -124,6 +164,33 @@ bool FSHTNWorldState::CheckCondition(const FSHTNCondition & Condition) const
 		UE_LOG(SHTNPlannerRuntime, Warning, TEXT("Default case hit in CheckCondition"));
 		return false;
 	}
+}
+
+bool FSHTNWorldState::CheckConditions(const TArray<FSHTNCondition>& Conditions) const
+{
+	bool bCurrentResult = true;
+
+	for (int32 ConditionIndex = 0; ConditionIndex < Conditions.Num(); ++ConditionIndex)
+	{
+		bool bConditionResult = CheckCondition(Conditions[ConditionIndex]);
+		
+		if (ConditionIndex == 0)
+		{
+			bCurrentResult = bConditionResult;
+		}
+		else
+		{
+			if (Conditions[ConditionIndex - 1].LogicalRelationToNextCondition == ESHTNLogicalOperators::AND)
+			{
+				bCurrentResult = bCurrentResult && bConditionResult;
+			}
+			else // Will be OR
+			{
+				bCurrentResult = bConditionResult || bConditionResult;
+			}
+		}
+	}
+	return bCurrentResult;
 }
 
 void FSHTNWorldState::ApplyEffect(const FSHTNEffect & Effect)

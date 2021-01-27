@@ -35,6 +35,10 @@ public:
 
 	FWorldStateDebugDetails* DetailBuilderPtr;
 
+	FDelegateHandle OnNewPlanMadeHandle;
+
+	bool bSelectInPIE;
+
 protected:
 
 	bool bCreated;
