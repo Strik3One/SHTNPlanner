@@ -6,7 +6,7 @@ This is a very simple implementation of a HTN Planner for Unreal Engine 4.25.
 
 This project serves as a graduation project, with the intended outcome to learn more about HTN Planning for video games. This might be helpful to others so feel free to experiment with it yourself and ask any questions that you might have.
 
-If you are unfamiliar with HTN Planning this is a great article to get familiar with the copcept:
+If you are unfamiliar with HTN Planning this is a great article to get familiar with the concept:
 * [Exploring HTN Planners through Example](http://www.gameaipro.com/GameAIPro/GameAIPro_Chapter12_Exploring_HTN_Planners_through_Example.pdf)
 
 ## Table of Contents
