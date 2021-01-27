@@ -47,6 +47,9 @@ Almost every event of the operator comes with two parameters. The first on is th
 Will be called both during planning and execution. During planning this will be used in order to check the conditions of a task to decide if it should be added to the plan or not. During execution it will be used to check if the task is still valid for execution - in case any WorldState values changed unexpectedly.
 
 >When this function is not implemented, the task return true by default upon condition checking
+-------------------------------
+#### `Get Score`
+Will be called if the composite task that contains this method is of type `Scored`.
 
 --------------------------------
 #### `Receive Initialize Action`
@@ -108,6 +111,8 @@ Composite tasks are stored in a map in the domain object, where the key is the n
 <img src="Resources/CompositeMap.png">
 
 Each composite task contains an array of methods which respectively contain an array of tasks. 
+
+You can switch the type of the task to `Scored`, this will order the methods of this task based on the score returned by the first task of each method. This means that when using the `Scored` type make sure the first task of each method is a `Primitive Task`
 >Tasks are specified with names, so be sure you dont make any typos (don't worry the network will throw an error if there are any tasks specified that don't exist in the network)
 
 ---
